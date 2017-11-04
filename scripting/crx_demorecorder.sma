@@ -1,52 +1,107 @@
 #include <amxmodx>
-#include <colorchat>
 
-#define PLUGIN_VERSION "1.0"
+#define CC_COLORS_TYPE CC_COLORS_SHORT
+#include <cromchat>
 
-new g_Delay
-new g_Filename, g_Message, g_Message2
-new const g_Colors[][] = { "!g", "^x04", "!t", "^x03", "!n", "^x01" }
-new const g_Symbols[][] = { " ", ":", ".", "*", "/", "|", "\", "?", ">", "<" }
+#define PLUGIN_VERSION "2.0"
+#define MAX_MESSAGE_LENGTH 192
+#define MAX_DEMO_NAME_LENGTH 64
+#define MAX_TIME_LENGTH 32
+#define DEMO_MESSAGES 2
+#define REPLACER_SYMBOL "_"
+
+#define ARG_NAME "<name>"
+#define ARG_NAME_FULL "<name>.dem"
+#define ARG_TIME "<time>"
+
+new const g_szSymbols[][] = { " ", ":", ".", "*", "/", "|", "\", "?", ">", "<" }
+
+enum _:Cvars
+{
+	dem_delay,
+	dem_msg_delay,
+	dem_name,
+	dem_message,
+	dem_message2,
+	dem_time_format
+}
+
+enum _:CvarValues
+{
+	Float:cv_dem_delay,
+	Float:cv_dem_msg_delay,
+	cv_dem_name[MAX_DEMO_NAME_LENGTH],
+	cv_dem_message[MAX_MESSAGE_LENGTH],
+	cv_dem_message2[MAX_MESSAGE_LENGTH],
+	cv_dem_time_format[MAX_TIME_LENGTH]
+}
+
+new g_eCvars[Cvars], g_eCvarValues[CvarValues]
 
 public plugin_init()
 {
 	register_plugin("Simple Demo Recorder", PLUGIN_VERSION, "OciXCrom")
 	register_cvar("CRXDemoRecorder", PLUGIN_VERSION, FCVAR_SERVER|FCVAR_SPONLY|FCVAR_UNLOGGED)
 	
-	g_Delay = register_cvar("dem_delay", "15.0")
-	g_Filename = register_cvar("dem_name", "CRX Auto Demo")
-	g_Message = register_cvar("dem_message", "!g[!tDemo RecordeR!g] !nWe are now recording in your !gcstrike !nfolder: !t<name>")
-	g_Message2 = register_cvar("dem_message2", "!g[!tDemo RecordeR!g] !nDemo recording has been started at: !t<time>")
+	g_eCvars[dem_delay] = register_cvar("dem_delay", "15.0")
+	g_eCvars[dem_msg_delay] = register_cvar("dem_msg_delay", "0.1")
+	g_eCvars[dem_name] = register_cvar("dem_name", "CRX Auto Demo")
+	g_eCvars[dem_message] = register_cvar("dem_message", "!g[!tDemo RecordeR!g] !nWe are now recording in your !gcstrike !nfolder: !t<name>")
+	g_eCvars[dem_message2] = register_cvar("dem_message2", "!g[!tDemo RecordeR!g] !nDemo recording has been started at: !t<time>")
+	g_eCvars[dem_time_format] = register_cvar("dem_time_format", "%X")
+}
+
+public plugin_cfg()
+{
+	g_eCvarValues[cv_dem_delay] = get_pcvar_float(g_eCvars[dem_delay])
+	g_eCvarValues[cv_dem_msg_delay] = get_pcvar_float(g_eCvars[dem_msg_delay])
+	get_pcvar_string(g_eCvars[dem_name], g_eCvarValues[cv_dem_name], charsmax(g_eCvarValues[cv_dem_name]))
+	get_pcvar_string(g_eCvars[dem_message], g_eCvarValues[cv_dem_message], charsmax(g_eCvarValues[cv_dem_message]))
+	get_pcvar_string(g_eCvars[dem_message2], g_eCvarValues[cv_dem_message2], charsmax(g_eCvarValues[cv_dem_message2]))
+	get_pcvar_string(g_eCvars[dem_time_format], g_eCvarValues[cv_dem_time_format], charsmax(g_eCvarValues[cv_dem_time_format]))
+	
+	for(new i; i < sizeof(g_szSymbols); i++)
+		replace_all(g_eCvarValues[cv_dem_name], charsmax(g_eCvarValues[cv_dem_name]), g_szSymbols[i], REPLACER_SYMBOL)
+		
+	add(g_eCvarValues[cv_dem_name], charsmax(g_eCvarValues[cv_dem_name]), ".dem")
 }
 
 public client_putinserver(id)
-	set_task(get_pcvar_float(g_Delay), "dem_start", id)
+	set_task(g_eCvarValues[cv_dem_delay], "StartRecording", id)
 
-public dem_start(id)
+public StartRecording(id)
 {
 	if(!is_user_connected(id))
 		return
 	
-	new szMessage[256], szMessage2[256], szFilename[128], szTime[9]
-	get_time("%H:%M:%S", szTime, charsmax(szTime))
-	get_pcvar_string(g_Message, szMessage, charsmax(szMessage))
-	get_pcvar_string(g_Message2, szMessage2, charsmax(szMessage2))
-	get_pcvar_string(g_Filename, szFilename, charsmax(szFilename))
+	client_cmd(id, "stop; record ^"%s^"", g_eCvarValues[cv_dem_name])
+	set_task(g_eCvarValues[cv_dem_msg_delay], "SendMessages", id)
+}
+
+public SendMessages(id)
+{
+	if(!is_user_connected(id))
+		return
+		
+	new szMessage[DEMO_MESSAGES][MAX_MESSAGE_LENGTH]
+	copy(szMessage[0], charsmax(szMessage[]), g_eCvarValues[cv_dem_message])
+	copy(szMessage[1], charsmax(szMessage[]), g_eCvarValues[cv_dem_message2])
 	
-	for(new i = 0; i < sizeof(g_Symbols); i++)
-		replace_all(szFilename, charsmax(szFilename), g_Symbols[i], "_")
-	
-	for(new i = 0; i < sizeof(g_Colors) - 1; i += 2)
+	for(new i; i < DEMO_MESSAGES; i++)
 	{
-		replace_all(szMessage, charsmax(szMessage), g_Colors[i], g_Colors[i + 1])
-		replace_all(szMessage2, charsmax(szMessage2), g_Colors[i], g_Colors[i + 1])
+		apply_replacements(szMessage[i], charsmax(szMessage[]))
+		CC_SendMessage(id, szMessage[i])
 	}
+}
+
+apply_replacements(szMessage[], const iLen)
+{
+	replace_all(szMessage, iLen, ARG_NAME, g_eCvarValues[cv_dem_name])
 	
-	replace(szMessage, charsmax(szMessage), "<name>", "^"<name>.dem^"")
-	replace(szMessage, charsmax(szMessage), "<name>", szFilename)
-	replace(szMessage2, charsmax(szMessage2), "<time>", szTime)
-	
-	ColorChat(id, TEAM_COLOR, "%s", szMessage)
-	ColorChat(id, TEAM_COLOR, "%s", szMessage2)
-	client_cmd(id, "stop; record ^"%s^"", szFilename)
+	if(contain(szMessage, ARG_TIME) != -1)
+	{
+		new szTime[MAX_TIME_LENGTH]
+		get_time(g_eCvarValues[cv_dem_time_format], szTime, charsmax(szTime))
+		replace_all(szMessage, iLen, ARG_TIME, szTime)
+	}
 }
