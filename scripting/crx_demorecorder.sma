@@ -53,8 +53,8 @@ public plugin_init()
 
 public plugin_cfg()
 {
-	g_eCvarValues[cv_dem_delay] = get_pcvar_float(g_eCvars[dem_delay])
-	g_eCvarValues[cv_dem_msg_delay] = get_pcvar_float(g_eCvars[dem_msg_delay])
+	g_eCvarValues[cv_dem_delay] = _:get_pcvar_float(g_eCvars[dem_delay])
+	g_eCvarValues[cv_dem_msg_delay] = _:get_pcvar_float(g_eCvars[dem_msg_delay])
 	get_pcvar_string(g_eCvars[dem_name], g_eCvarValues[cv_dem_name], charsmax(g_eCvarValues[cv_dem_name]))
 	get_pcvar_string(g_eCvars[dem_message], g_eCvarValues[cv_dem_message], charsmax(g_eCvarValues[cv_dem_message]))
 	get_pcvar_string(g_eCvars[dem_message2], g_eCvarValues[cv_dem_message2], charsmax(g_eCvarValues[cv_dem_message2]))
